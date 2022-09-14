@@ -47,7 +47,7 @@ export class Formatter implements vscode.CodeActionProvider {
         while (currentLine >= 0) {
             const text = document.lineAt(currentLine).text.trim();
             // only support statement like "if|while|for|else if|... () {", 
-            if (text.includes(';') || /\) *{$/i.test(text) || text.includes('{')) { break; }
+            if (text.includes(';') || /\) *{$/i.test(text) || text.includes('{') || text.includes('}')) { break; }
             if (text !== '') { start = currentLine; }
             result = text + result;
             currentLine--;
