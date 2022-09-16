@@ -2,7 +2,7 @@
 	"name": "logger-formatter",
 	"displayName": "Logger Formatter",
 	"description": "Say goodbye to java:S2629",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"engines": {
 		"vscode": "^1.68.0"
 	},
