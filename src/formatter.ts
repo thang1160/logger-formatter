@@ -132,20 +132,14 @@ export class Formatter implements vscode.CodeActionProvider {
             message = codeBlock.code.substring(codeBlock.code.indexOf('(') + 1, codeBlock.code.lastIndexOf(')'));
         }
         message = message.trim();
-        if (message.includes('(')) {
-            // TODO: temporary handle message with parentheses
-            message = `() -> ${message}`;
-            replacement += `, ${message});`;
+        const messageParams = this.standardizeMessage(message);
+        let params = '';
+        if (messageParams.params.length === 1) {
+            params = messageParams.params[0];
         } else {
-            const messageParams = this.standardizeMessage(message);
-            let params = '';
-            if (messageParams.params.length === 1) {
-                params = messageParams.params[0];
-            } else {
-                params = `new Object[] {${messageParams.params.join(', ')}}`;
-            }
-            replacement += `, ${messageParams.message}, ${params});`;
+            params = `new Object[] {${messageParams.params.join(', ')}}`;
         }
+        replacement += `, ${messageParams.message}, ${params});`;
 
 
         fix.edit.replace(document.uri, new vscode.Range(startPosition, endPosition), replacement);
@@ -171,18 +165,26 @@ export class Formatter implements vscode.CodeActionProvider {
                 const nextIndex = this.indexEndDoubleQuote(messageWithoutArgs, 1);
                 message += messageWithoutArgs.substring(1, nextIndex);
                 messageWithoutArgs = messageWithoutArgs.substring(nextIndex + 1);
-            } else if (/^[a-z_$]/i.test(messageWithoutArgs)) {
-                // either severe(abc) or severe(abc + ...) or severe(abc+ ...)
-                const index = Math.min(messageWithoutArgs.indexOf('+'), messageWithoutArgs.indexOf(' '));
-                message += `{${params.length}}`;
-                if (index === -1) {
-                    params.push(messageWithoutArgs);
-                    messageWithoutArgs = "";
-                } else {
-                    params.push(messageWithoutArgs.substring(0, index));
-                    messageWithoutArgs = messageWithoutArgs.substring(index);
+            } else if (messageWithoutArgs.startsWith('(')) {
+                const nextIndex = this.indexEndRightParentheses(messageWithoutArgs);
+                if (nextIndex === -1) {
+                    console.log(`message: ${messageWithoutArgs}`);
+                    throw new Error("Unsupported message");
                 }
+                params.push(messageWithoutArgs.substring(0, nextIndex + 1));
+                messageWithoutArgs = messageWithoutArgs.substring(nextIndex + 1);
+            } else if (/^[a-z_$]/i.test(messageWithoutArgs)) {
+                // messageWithoutArgs start with a variable or function call of variable
+                // like severe(abc) or severe(abc + ...) or severe(abc+ ...)
+                // it can detect simple function call like myMap.get("key") 
+                // but not with myMap.get("my key") or myMap.get("key" + 1)
+                let index = Math.min(messageWithoutArgs.indexOf('+'), messageWithoutArgs.indexOf(' '));
+                message += `{${params.length}}`;
+                index = index === -1 ? messageWithoutArgs.length : index;
+                params.push(messageWithoutArgs.substring(0, index).replace(".toString()", ""));
+                messageWithoutArgs = messageWithoutArgs.substring(index);
             } else {
+                console.log(`message: ${messageWithoutArgs}`);
                 throw new Error("Invalid message");
             }
             messageWithoutArgs = messageWithoutArgs.trim();
@@ -195,7 +197,13 @@ export class Formatter implements vscode.CodeActionProvider {
         return { message: message + '"', params };
     }
 
-    private indexEndDoubleQuote(message : string, start: number) : number {
+    /**
+     * get `"` not `\"`
+     * @param message ex: `"level: \"severe\""`
+     * @param start 
+     * @returns 
+     */
+    private indexEndDoubleQuote(message: string, start: number): number {
         let index = start;
         for (; index < message.length; index++) {
             if (message[index] === '"' && message[index - 1] !== '\\') {
@@ -203,6 +211,29 @@ export class Formatter implements vscode.CodeActionProvider {
             }
         }
         return index;
+    }
+
+    /**
+     * get index of right parentheses for `message[0]`
+     * 
+     * curretly couldn't detect fake end parentheses, ex: `("my message )"+message)`
+     * @param message ex: `("my index" + (1 + index))`
+     * @returns 
+     */
+    private indexEndRightParentheses(message: string): number {
+        let stack = [];
+        for (let index = 0; index < message.length; index++) {
+            if (message[index] === '(') {
+                stack.push('(');
+            }
+            if (message[index] === ')') {
+                stack.pop();
+                if (stack.length === 0) {
+                    return index;
+                }
+            }
+        }
+        return -1;
     }
 
     private createCommand(): vscode.CodeAction {

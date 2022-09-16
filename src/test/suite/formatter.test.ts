@@ -32,6 +32,7 @@ suite('Formatter Test Suite', () => {
 			{ inputMessage: 'jobId+ "job id:"', expectedMessage: '"{0}job id:"', expectedParams: ['jobId'] },
 			{ inputMessage: 'jobId +"job id:"', expectedMessage: '"{0}job id:"', expectedParams: ['jobId'] },
 			{ inputMessage: 'jobId1 + ":testing:" + jobId2', expectedMessage: '"{0}:testing:{1}"', expectedParams: ['jobId1', 'jobId2'] },
+			{ inputMessage: 'map.get("key") + ":testing:" + jobId2.toString()', expectedMessage: '"{0}:testing:{1}"', expectedParams: ['map.get("key")', 'jobId2'] },
 		];
 		console.log(`testCases.length: ${testCases.length}`);
 		for (const testCase of testCases) {
